@@ -1,7 +1,8 @@
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Tuple, List
 
-from src.chunking.text_splitter import MarkdownTextSplitter
+from src.chunking.catalog_splitter import CatalogBasedSplitter
+from src.chunking.catalog_extractor import CatalogItem
 from src.core.config import Settings
 from src.embeddings.generator import EmbeddingGenerator, EmbeddingConfig
 from src.parsers import get_parser
@@ -18,15 +19,15 @@ class DocumentProcessor:
         self.settings = settings
         self.vector_store = vector_store
         self.logger = logger
-        self.chunker = MarkdownTextSplitter(
-            chunk_size=settings.chunk_size,
-            chunk_overlap=settings.chunk_overlap,
+        self.chunker = CatalogBasedSplitter(
+            min_chunk_size=settings.chunk_size // 2,
+            max_chunk_size=settings.chunk_size * 2,
         )
         self.embedder = EmbeddingGenerator(
             EmbeddingConfig(
                 model_name=settings.embedding_model,
                 api_base=settings.embedding_api_base,
-                api_key=settings.openai_api_key,
+                api_key=settings.embedding_api_key or settings.openai_api_key,
             )
         )
 
@@ -36,10 +37,15 @@ class DocumentProcessor:
         if not text.strip():
             self.logger.warning("No text extracted from %s", path)
             return None
-        chunks = self.chunker.split(text)
+        
+        # Use catalog-based splitting
+        catalog_items, chunks, chunk_metadata_list = self.chunker.split(text)
         if not chunks:
             self.logger.warning("Chunking produced no output for %s", path)
             return None
+        
+        self.logger.info("Extracted %d catalog items, created %d chunks", len(catalog_items), len(chunks))
+        
         vectors = self.embedder.embed(chunks)
         parsed_name = f"{path.stem}.md"
         parsed_path = Path("data/parse") / parsed_name
@@ -53,11 +59,14 @@ class DocumentProcessor:
             chunks=chunks,
             vectors=vectors,
             content_type=content_type,
+            catalog_items=catalog_items,
+            chunk_metadata_list=chunk_metadata_list,
         )
         self.logger.info(
-            "Processed %s into %s chunks (doc_id=%s)",
+            "Processed %s into %s chunks with %s catalog items (doc_id=%s)",
             path.name,
             len(chunks),
+            len(catalog_items),
             metadata.document_id,
         )
         return metadata.document_id
@@ -72,10 +81,10 @@ class DocumentProcessor:
         return processed
 
     def save_upload(self, filename: str, data: bytes) -> Path:
-        origin_dir = Path("data/origin")
-        origin_dir.mkdir(parents=True, exist_ok=True)
+        upload_dir = Path("data/upload")
+        upload_dir.mkdir(parents=True, exist_ok=True)
         safe_name = filename.replace(" ", "_")
-        target = origin_dir / safe_name
+        target = upload_dir / safe_name
         with target.open("wb") as fh:
             fh.write(data)
         return target

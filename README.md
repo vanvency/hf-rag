@@ -16,7 +16,7 @@ A production-ready Retrieval-Augmented Generation (RAG) system that enables inte
 ```
 
 ├── data/              # 
-│   ├── origin/        # Origin files for processing
+│   ├── upload/        # Upload files for processing
 │   ├── parse/         # Processed markdown outputs
 │   ├── db/            # Data storage
 ├── src/
@@ -26,16 +26,17 @@ A production-ready Retrieval-Augmented Generation (RAG) system that enables inte
 │   ├── embeddings/   # Vector embedding generation
 │   └── retrieval/    # Search and retrieval logic
 └── tests/            # Unit and integration tests
-
+│   ├── docs/         # Test doc files
+│   └── docs_qa.xlsx  # Question and ground-trueth answer
 ```
 
 ## 🚀 Core Functions
 
 ### 1. File Processing & OCR
-- Reads files from the `data/` folder
+- Reads files from the `data/upload` folder
 - Supports multiple file formats (PDF, images, DOCX, etc.)
 - Parses content using OCR when necessary
-- Outputs clean markdown-formatted data to `data-parse/` folder
+- Outputs clean markdown-formatted data to `data/parse/` folder
 - Preserves document structure and formatting
 
 ### 2. Document Chunking
@@ -54,6 +55,11 @@ A production-ready Retrieval-Augmented Generation (RAG) system that enables inte
 - Performs semantic search across document chunks
 - Returns relevant content with source attribution
 - Configurable result ranking and filtering
+
+### 5. Complete Workflow with UI
+User able to upload and parsed the file into markdown with extracted catalog, view and edit markdown result and catalog result, chunk markdown result into slices based on catalog, and create embedding vector based on slices, and then user able to search the uploaded file by following step
+1. search by fulltext on catalog, if related then just return the full pages of related catalog and lastly use llm api to generate answer to the query
+2. if no catalog related, then use vector search on slices embeddings, return related slices and lastly use llm api to generate answer to the query 
 
 ## 📋 Requirements
 
@@ -100,6 +106,8 @@ brew install tesseract
 
 ## ⚙️ Configuration
 
+**Important**: This system requires OpenAI-compatible APIs for both LLM and embedding services. Local models are not supported.
+
 Create a `.env` file in the root directory:
 
 ```env
@@ -107,15 +115,19 @@ Create a `.env` file in the root directory:
 API_HOST=0.0.0.0
 API_PORT=8000
 
-# LLM Configuration
-OPENAI_API_BASE=
-OPENAI_API_KEY=your_api_key_here
+# LLM Configuration (REQUIRED)
+OPENAI_API_BASE=https://your-llm-api-endpoint.com/v1
+OPENAI_API_KEY=your_llm_api_key_here
 MODEL_NAME=gpt-3.5-turbo
+
+# Embedding Configuration (REQUIRED)
+# Use EMBEDDING_API_KEY if different from OPENAI_API_KEY, otherwise it will use OPENAI_API_KEY
+EMBEDDING_API_BASE=https://your-embedding-api-endpoint.com/v1
+EMBEDDING_API_KEY=your_embedding_api_key_here
+EMBEDDING_MODEL=text-embedding-ada-002
 
 # Vector Store Configuration
 VECTOR_STORE_PATH=./data/db/
-EMBEDDING_API_BASE=
-EMBEDDING_MODEL=text-embedding-ada-002
 
 # Chunking Configuration
 CHUNK_SIZE=1000
@@ -124,6 +136,12 @@ CHUNK_OVERLAP=200
 # OCR Configuration
 OCR_DPI=300
 ```
+
+**Required Settings**:
+- `OPENAI_API_BASE` and `OPENAI_API_KEY` - For LLM answer generation
+- `EMBEDDING_API_BASE` and `EMBEDDING_API_KEY` (or `OPENAI_API_KEY`) - For embedding generation
+
+Both APIs must be OpenAI-compatible (support `/v1/chat/completions` and `/v1/embeddings` endpoints).
 
 ## 🚀 Usage
 
@@ -146,7 +164,7 @@ cp your_files/* data/
 # Run the processing pipeline
 python -m src.process_documents run
 
-# Processed markdown files will be in data-parse/
+# Processed markdown files will be in data/parse/
 ```
 
 ### API Endpoints
@@ -225,7 +243,7 @@ pytest
 ```
 .
 ├── data/
-│   ├── origin/             # Input files
+│   ├── upload/             # Input files
 │   ├── parse/              # Processed markdown files
 │   ├── db/           # Vector database storage
 ├── src/

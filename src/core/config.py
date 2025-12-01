@@ -15,7 +15,8 @@ class Settings(BaseSettings):
 
     vector_store_path: Path = Path("./data/db/")
     embedding_api_base: Optional[str] = None
-    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    embedding_api_key: Optional[str] = None
+    embedding_model: str = "atom"
 
     chunk_size: int = 800
     chunk_overlap: int = 200
