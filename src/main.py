@@ -1,4 +1,5 @@
 from pathlib import Path
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,6 +13,22 @@ from src.core.logging import configure_logging
 from src.retrieval.search import VectorStore
 from src.services.processor import DocumentProcessor
 from src.services.llm_service import LLMService
+
+
+def create_lifespan(logger):
+    """Create lifespan event handler with logger"""
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        """Lifespan event handler for startup and shutdown"""
+        # Startup
+        logger.info("=" * 60)
+        logger.info("RAG System 服务器已启动")
+        logger.info("所有API请求将记录到控制台")
+        logger.info("=" * 60)
+        yield
+        # Shutdown (if needed)
+        # logger.info("服务器正在关闭...")
+    return lifespan
 
 
 def create_app() -> FastAPI:
@@ -40,9 +57,18 @@ def create_app() -> FastAPI:
         title="RAG System",
         version="1.0.0",
         docs_url="/docs",
+        lifespan=create_lifespan(logger),
     )
     
-    # Add CORS middleware to allow frontend to communicate with API
+    # IMPORTANT: Middleware execution order in FastAPI/Starlette:
+    # - Middleware is executed in REVERSE order (last added = first executed)
+    # - LoggingMiddleware should be added FIRST so it executes LAST (after CORS)
+    # - This ensures it can log the final response after all other middleware
+    
+    # Add logging middleware FIRST (will execute LAST, after CORS)
+    app.add_middleware(LoggingMiddleware, logger=logger)
+    
+    # Add CORS middleware SECOND (will execute FIRST, before logging)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],  # In production, replace with specific origins
@@ -51,9 +77,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     
+    # Include routers AFTER middleware (middleware will intercept all routes)
     app.include_router(api_router)
-    # Add logging middleware (must be added after CORS)
-    app.add_middleware(LoggingMiddleware, logger=logger)
     
     # Get the project root directory
     project_root = Path(__file__).parent.parent
@@ -94,14 +119,6 @@ def create_app() -> FastAPI:
     app.state.vector_store = vector_store
     app.state.processor = processor
     app.state.llm_service = llm_service
-    
-    # Add startup event to verify logging
-    @app.on_event("startup")
-    async def startup_event():
-        logger.info("=" * 60)
-        logger.info("RAG System 服务器已启动")
-        logger.info("所有API请求将记录到控制台")
-        logger.info("=" * 60)
 
     return app
 

@@ -14,7 +14,7 @@ ImageParser = None
 try:
     from .image_parser import ImageParser
 except Exception as e:
-    logger.warning(f"ImageParser (OCR) not available: {e}. Image files will not be supported.")
+    logger.warning(f"ImageParser (MinerU OCR) not available: {e}. Image files will not be supported.")
 
 PARSERS: List[BaseParser] = [
     TextParser(),

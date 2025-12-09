@@ -11,9 +11,23 @@ class LoggingMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, logger):
         super().__init__(app)
         self.logger = logger
+        # Verify middleware initialization
+        if logger:
+            try:
+                logger.debug("LoggingMiddleware initialized successfully")
+            except:
+                print("[MIDDLEWARE] LoggingMiddleware initialized", flush=True)
 
     async def dispatch(self, request: Request, call_next: Callable):
+        # This method MUST be called for every request
         start = time.perf_counter()
+        
+        # Debug: Verify middleware is being called
+        try:
+            if self.logger:
+                self.logger.debug(f"Middleware intercepting: {request.method} {request.url.path}")
+        except:
+            print(f"[MIDDLEWARE DEBUG] Intercepting: {request.method} {request.url.path}", flush=True)
         
         # Log request details
         method = request.method
